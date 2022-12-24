@@ -165,13 +165,17 @@ Default: t"
 (defun loccur-current ()
   "Call `loccur' for the current word."
   (interactive)
-  (loccur (current-word)))
+  (loccur (current-word)
+          (when current-prefix-arg
+	          (prefix-numeric-value current-prefix-arg))))
 
 
 (defun loccur-previous-match ()
   "Call `loccur' for the previously found word."
   (interactive)
-  (loccur loccur-last-match))
+  (loccur loccur-last-match
+          (when current-prefix-arg
+	          (prefix-numeric-value current-prefix-arg))))
 
 (defun loccur-no-highlight (regex)
   "Perform search like loccur, but temporary removing match highlight.
@@ -179,7 +183,9 @@ REGEX is regexp to search"
   (interactive
    (if loccur-mode
        nil
-     (list (read-string "Loccur: " (loccur-prompt) 'loccur-history))))
+     (list (read-string "Loccur: " (loccur-prompt) 'loccur-history)
+           (when current-prefix-arg
+	           (prefix-numeric-value current-prefix-arg)))))
   (let ((loccur-highlight-matching-regexp nil))
     (loccur regex)))
 
