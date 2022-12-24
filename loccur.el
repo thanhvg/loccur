@@ -301,7 +301,6 @@ REGEX is an argument to `loccur'."
   (remove-overlays (point-min) (point-max) loccur-overlay-invisible-property-name t)
   (setq loccur-overlay-list nil))
 
-
 (defun loccur-create-overlay-bounds-btw-lines (buffer-matches)
   "Create a list of overlays between matched lines BUFFER-MATCHES."
   (let ((prev-end (point-min))
@@ -330,11 +329,16 @@ containing match"
     (goto-char (point-min))
     ;; Set initial values for variables
     (let ((endpoint nil)
-          (lines (list)))
+          (lines (list))
+          (current-line nil)
+          (current-end nil))
       ;; Search loop
       (while (not (eobp))
         ;; if something found
         (when (setq endpoint (re-search-forward regex nil t))
+          ;; (save-excursion
+          ;;   (setq lines (append (loccur--make-top-padding 2) lines)))
+
           (save-excursion
             (let ((found-begin (match-beginning 0))
                   (found-end (match-end 0)))
@@ -342,15 +346,79 @@ containing match"
               ;; and store it to the overlays array
               (goto-char found-begin)
               (setq endpoint (line-end-position))
+
+              (let* ((tpds (loccur--make-top-padding 2))
+                     (lines-tip (car (car lines)))
+                     (tpds-tip-head (car (car tpds))))
+                (if (or (not lines)
+                        (> tpds-tip-head lines-tip))
+                    (setq lines (append (nreverse tpds) lines))
+                  (let* ((my-lines (cdr lines))
+                         (my-tip (car my-lines)))
+                    (catch 'done
+                      (while (>= (car my-tip) tpds-tip-head)
+                        (when (loccur--main-line-p my-tip)
+                          ;; cut off tpds to bellow my-tip
+                          (let* ((my-tpds tpds)
+                                 (my-tpds-tip (car my-tpds)))
+                            (while (and
+                                    my-tpds-tip
+                                    (>= (car my-tip) (car my-tpds-tip)))
+                              (setq my-tpds (cdr my-tpds))
+                              (setq my-tpds-tip (car my-tpds)))
+                            (setq lines (append (nreverse my-tpds) my-lines))
+                            (throw 'done t)))
+                        (setq my-lines (cdr my-lines))
+                        (setq my-tip (car my-lines)))
+                      (setq lines (append (nreverse tpds) my-lines))))))
+
               (push (list (line-beginning-position)
                           found-begin
                           found-end
-                          endpoint) lines)))
+                          endpoint)
+                    lines)))
+          (setq lines (append (loccur--make-bottom-padding 2) lines ))
           ;; maybe add some code to highlight matches like in occur-mode?
           ;; goto the end of line for any case
           (goto-char endpoint))
         (forward-line 1))
       (setq lines (nreverse lines)))))
+
+(defun loccur--main-line-p (nums)
+  "NUMS is list of 4 numbers"
+  (/= (nth 1 nums ) (nth 2 nums)))
+
+(defun loccur--make-bottom-padding (nlines)
+  "Generate list of next nlines."
+  (let ((boundary (line-beginning-position))
+        (lines nil))
+    (forward-line nlines)
+    (let ((current (line-beginning-position)))
+      (while (> current boundary)
+        (push (list current
+                    current
+                    current
+                    (line-end-position))
+              lines)
+        (forward-line -1)
+        (setq current (line-beginning-position))))
+    (nreverse lines)))
+
+(defun loccur--make-top-padding (nlines)
+  "Make list of nlines above."
+  (let ((boundary (line-beginning-position))
+        (lines nil))
+    (forward-line (- nlines))
+    (let ((current (line-beginning-position)))
+      (while (< current boundary)
+        (push (list current
+                    current
+                    current
+                    (line-end-position))
+              lines)
+        (forward-line 1)
+        (setq current (line-beginning-position))))
+    (nreverse lines)))
 
 (defun loccur-isearch-update ()
   "Apply `loccur' according the current Isearch state."
@@ -362,11 +430,11 @@ containing match"
                                     isearch-lax-whitespace)
                                   search-whitespace-regexp)))
     (loccur (cond
-	     ((functionp isearch-regexp-function)
-	      (funcall isearch-regexp-function isearch-string))
-	     (isearch-regexp-function (word-search-regexp isearch-string))
-	     (isearch-regexp isearch-string)
-	     (t (regexp-quote isearch-string))))))
+             ((functionp isearch-regexp-function)
+              (funcall isearch-regexp-function isearch-string))
+             (isearch-regexp-function (word-search-regexp isearch-string))
+             (isearch-regexp isearch-string)
+             (t (regexp-quote isearch-string))))))
 
 (defun loccur-isearch-exit ()
   "Deactivate `loccur-isearch'."
